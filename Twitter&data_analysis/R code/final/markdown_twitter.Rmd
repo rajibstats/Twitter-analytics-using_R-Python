@@ -1,0 +1,383 @@
+---
+title: "Untitled"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Loading libraries
+
+
+```{r }
+rm(list = ls())
+
+library("twitteR")
+library("wordcloud")
+library("tm")
+library("plyr")
+library(plyr)        # to break big problem into smaller
+library(stringr)     # make easier to work with strings
+library(ROAuth)
+library(twitteR)
+library(ggplot2)
+library(tidytext)
+library(dplyr)
+
+```
+
+## Set working directory To Project Directory 
+
+```{r }
+
+setwd("D:\\Rajib Documents\\MEGAsync\\MEGAsync\\UpWork\\Twitter&data_analysis\\R code")
+
+```
+
+## Getting Data from Twitter 
+
+```{r }
+requestURL <-  "https://api.twitter.com/oauth/request_token"
+accessURL <-  "https://api.twitter.com/oauth/access_token"
+authURL <-  "https://api.twitter.com/oauth/authorize"
+consumerKey <-  "HaJjtqjOVhPvAKpIJ240UdoDB"
+consumerSecret <-  "GL7qOAXs18KwGyAaymuaBaesGTWJ2fBxnjq5z1XRg9yQqAmeQT"
+
+
+my_oauth <- OAuthFactory$new(consumerKey=consumerKey,
+                             consumerSecret=consumerSecret, requestURL=requestURL,
+                             accessURL=accessURL, authURL=authURL)
+
+# run this line and go to the URL that appears on screen
+my_oauth$handshake(cainfo = system.file("CurlSSL", "cacert.pem", package = "RCurl"))
+
+# now we can save oauth token for use in future sessions with twitteR or streamR
+save(my_oauth, file = "my_oauth.Rdata")
+#load("my_oauth.Rdata")
+
+accessToken = '806201386740416514-N9cqYwbNgOfJkAltCZkWQC9kZYFssMW'
+accessSecret = 'h7mP2E5FzOp7Nyqu4Imp67du1oB7tjQDM1YlzHB2UUEYm'
+
+# testing that it works
+
+setup_twitter_oauth(consumer_key=consumerKey, consumer_secret=consumerSecret,
+                    access_token=accessToken, access_secret=accessSecret)
+
+tweets<-searchTwitter('#HU', n =200, lang="en", since='2014-03-01', until='2018-12-06')
+
+tweets_df <- twListToDF(tweets)
+
+```
+
+## What language do HU friends speak?
+
+```{ r}
+
+user <- getUser("HarrisburgU")
+friends <- user$getFriends() # who HU follows
+friends_df <- twListToDF(friends)
+friends_df$lang  ##What language do HU friends speak?
+
+```
+
+## what language do they speak?
+
+```{ r}
+unique(friends_df$lang)
+
+```
+
+## Draw the distribution of friends
+
+```{ r}
+
+# First we take a look at number the distribution of followers of my friends. 
+ggplot(friends_df, aes(x = log(followersCount))) +
+  geom_density(fill ="blue") +
+  theme_light() +
+  labs(x = "Log of number of followers of my friends", y = "density")
+
+
+```
+
+
+## Description stats
+
+```{ r}
+summary(friends_df$followersCount)
+
+```
+
+## Next we take a look at the distribution of the number of tweets by my friends.
+
+```{ r}
+
+ggplot(friends_df, aes(x = log(statusesCount))) +
+  geom_density(fill ="grey") +
+  theme_light() +
+  labs(x = "Log of number of tweets of my friends", y = "density")
+
+```
+
+According to the plots, both the numberoffollowers and the numberoftweets of my friends follow log-normal distribution.
+
+# How active are HU friends ?
+
+## Calculate tweets per day in the past year
+
+```{ r}
+
+date = as.Date(friends_df$created, format = "%Y-%m-%d")
+today = as.Date("2017-02-25", format = "%Y-%m-%d")
+days = as.numeric(today - date)
+friends_df$statusesCount_pDay = friends_df$statusesCount/days
+
+#plot the distribution
+ggplot(friends_df, aes(x = log(statusesCount_pDay))) + 
+  geom_density(fill = "grey") +
+  theme_light() +
+  labs(x = "Log of number of tweets per day", y = "density")
+
+```
+
+
+## Description stats
+
+```{ r}
+summary(friends_df$statusesCount_pDay)
+
+```
+
+# Who are my followers with the biggest network and who tweet the most
+
+## person with most friends
+
+```{ r}
+friends_df[order(friends_df$friendsCount, decreasing = T), ]$name[1]
+```
+
+## person with most followers
+
+```{ r}
+friends_df[order(friends_df$followersCount, decreasing = T), ]$name[1]
+```
+
+## person who tweets the most
+
+```{ r}
+friends_df[order(friends_df$statusesCount, decreasing = T), ]$name[1]
+```
+
+## Is there a correlation between number of followers and number of tweets?
+
+```{ r}
+
+ggplot(friends_df, aes(x = followersCount, y = statusesCount)) +
+  geom_point()+
+  labs (x = "number of followers", y = "number of tweets") +
+  geom_smooth(method = "lm", formula = y~x)
+  
+```
+
+
+## Eliminating outliers
+
+```{ r}
+ggplot(friends_df, aes(x = followersCount, y = statusesCount)) +
+  geom_point()+
+  labs (x = "number of followers", y = "number of tweets") +
+  geom_smooth(method = "lm", formula = y~x)+
+  scale_x_continuous(limits = quantile(friends_df$followersCount, c(0.05, 0.95))) +
+  scale_y_continuous(limits = quantile(friends_df$statusesCount, c(0.05, 0.95)))
+  
+cor.test(x = friends_df$followersCount, y = friends_df$statusesCount)
+cor(friends_df$statusesCount, friends_df$friendsCount)
+
+  
+```
+
+
+## What are the most commonly used words in HU friends followers' descriptions? (Tidytext package)
+
+```{ r}
+
+#convert them to the word stem, remove stop words and urls.
+
+data(stop_words)
+
+tidy_descr = unnest_tokens(friends_df, word, description)
+new_descr = anti_join(tidy_descr, stop_words, by="word")
+best_descr = filter(new_descr, !grepl("\\.|http", word))
+
+wscount = as.data.frame(table(best_descr$word))
+colnames(wscount) = c("word", "count")
+wscount_t10 = wscount[order(wscount$count, decreasing = T),][1:10,]
+ggplot(wscount_t10, aes(x = reorder(word, count), y = count)) +
+  geom_col(color = "grey") +
+  theme_light() +
+  coord_flip() +
+  labs(x = "", y = "count of words in HU friend's description")
+
+```
+
+## Optional: Are HU followers talk positively or negatively abut HU?
+
+```{ r, echo = FALSE}
+
+clean.text <- function(some_txt)
+{  some_txt = gsub("(RT|via)((?:\\b\\W*@\\w+)+)", "", some_txt)
+
+# Remove the text which start from "@"
+some_txt = gsub("@\\w+", "", some_txt)
+
+# Remove punctuations
+some_txt = gsub("[[:punct:]]", "", some_txt)
+
+#Remove Digits
+some_txt = gsub("[[:digit:]]", "", some_txt)
+
+#Remove links
+some_txt = gsub("http\\w+", "", some_txt)
+
+# remove extra white spaces
+some_txt = gsub("[ \t]{2,}", "", some_txt)
+some_txt = gsub("^\\s+|\\s+$", "", some_txt)
+
+
+# Remove non-english characters
+some_txt = gsub("[^\x20-\x7E]", "", some_txt)
+
+# define "tolower error handling" function
+try.tolower = function(x)
+{  y = NA
+try_error = tryCatch(tolower(x), error=function(e) e)
+if (!inherits(try_error, "error"))
+  y = tolower(x)
+return(y)
+}
+
+some_txt = sapply(some_txt, try.tolower)
+some_txt = some_txt[some_txt != ""]
+names(some_txt) = NULL
+return(some_txt)
+}
+
+
+```
+
+
+```{ r}
+
+# clean text
+sentdata_clean = clean.text(tweets_df$text)
+
+# remove duplicated text after cleaning
+sentdata_clean=as.data.frame(sentdata_clean[!duplicated(sentdata_clean)])
+names(sentdata_clean)=c("text")
+
+```
+
+
+# Lexicon based sentiment analysis
+
+## loading lexicon of positive and negative words (from Neal Caren)
+
+```{ r}
+lexicon <- read.csv("lexicon_polarity.csv", stringsAsFactors=F)
+pos.words <- lexicon$word[lexicon$popularity=="positive"]
+neg.words <- lexicon$word[lexicon$popularity=="negative"]
+```
+
+
+```{ r, echo = FALSE}
+
+score.sentiment = function(sentences, pos.words, neg.words, .progress='none')
+{
+  
+  
+  
+  nscores = laply(sentences, function(sentence, pos.words, neg.words) {
+    
+    
+    # split into words. str_split is in the stringr package
+    word.list = str_split(sentence, '\\s+')
+    # word.list = str_split(sample_clean$text, '\\s+')
+    
+    # sometimes a list() is one level of hierarchy too much
+    words = unlist(word.list)
+    
+    # compare our words to the dictionaries of positive & negative terms
+    pos.matches = match(words, pos.words)
+    neg.matches = match(words, neg.words)
+    
+    # compare our words with list of negation words
+    #  negation.matches=match(words,negation)
+    
+    
+    
+    
+    # match() returns the position of the matched term or NA
+    pos.matches = !is.na(pos.matches)
+    neg.matches = !is.na(neg.matches)
+    
+    
+    
+    nscore=sum(pos.matches)-sum(neg.matches)  
+    
+    
+    
+    return(nscore)
+  }, pos.words, neg.words,.progress=.progress )
+  
+  scores.df = data.frame(score=nscores, text=sentences)
+  return(scores.df)
+}
+
+```
+
+```{ r}
+score=score.sentiment(sentdata_clean$text,pos.words,neg.words)
+score$level=ifelse(score < 0, "Negative", ifelse(score == 0, "Neutral", "Positive"))
+
+# sentiment
+
+score[,-1]
+
+```
+
+## Preparing graph
+
+```{ r}
+
+names(score)=c("Value","text","level")
+#score$Value=as.list(score$Value)
+
+# positive
+a2=score[ which(score$Value > 0), ]
+
+# negative
+a3=score[ which(score$Value < 0), ]
+
+# neutral
+a4=score[ which(score$Value == 0), ]
+
+## find percentage
+pos= (nrow(a2)/nrow(score))*100
+neg= (nrow(a3)/nrow(score))*100
+neu= (nrow(a4)/nrow(score))*100
+
+df1=data.frame(values=c(pos,neg,neu),
+               sentiment=c("Positive","Negative","Neutral"))
+
+barplot(df1$value, names = df1$sentiment,
+        xlab = "Sentiment", ylab = "Percentage",
+        main = "Sentiment analysis for #HU ",
+        col=c("orange","black","green"))
+
+```
+
+
+

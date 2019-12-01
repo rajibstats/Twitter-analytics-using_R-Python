@@ -1,0 +1,11 @@
+Assignment 2 File has attached instructions of exactly what needs to be done.
+Final Deliverable is a detailed IPython notebook, PDF export of the IPython notebook and 5 slide ppt presentation summarizing it all.
+You might need to do some minor research about the Canadian Federal Elections held in Nov2019 as well to draw some meaningful conclusion from this.
+See file named "Assignment 2 - Fall 2019" for details of exactly what is needed.
+All required files are uploaded.
+
+
+You should have all the files now. Please do review the instructions file titled "Assignment 2...." as there are multiple parts to this problem.
+Ensure to comment throughout the notebook to clarify the portions of the code and and rationalize/justify any assumptions or observations in markdown cells.
+First, develop the model on the "genetic tweets" file and see which model (try out at least 2-3 models among logistic regression, k-NN, Naive Bayes, SVM, decision trees, ensembles (RF, XGBoost)) works best. And use that model for the Canadian Elections csv. Also, as I said, you will have to do some minor research on the 2019 Canadian Federal Election as well just to know the parties and the end result
+All of it must be in the same notebook.

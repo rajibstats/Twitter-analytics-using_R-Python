@@ -1,0 +1,29 @@
+#memory clear
+rm(list = ls())
+
+set.seed(234)
+nums<-rpois(6,4)
+gender<-sample(c("Male", "Female"), size=6, replace = TRUE)
+product<-sample(c("A", "B", "C"), size=6, replace = TRUE)
+data_set<-cbind(gender,product,nums)
+data<-as.data.frame(data_set)
+library(plyr)
+df <- rename(data, c("nums" = "price"))
+
+library(vcd)
+data(WomenQueue)
+head(WomenQueue)
+Dat1<-as.data.frame(WomenQueue)
+
+hist(data1,main="Women Queue Depature Distribution",xlab="Counts",ylab="Frequency")
+barplot(WomenQueue, main="Women Queue Depature Distribution",xlab="Counts",ylab="Frequency")
+library(MASS)
+fit <- fitdistr(WomenQueue, densfun="normal")
+fit
+curve(dnorm(x, fit$estimate[1], fit$estimate[2]), col="red", lwd=2, add=TRUE)
+
+
+
+
+data("Hospital", package="vcd")
+Hospital

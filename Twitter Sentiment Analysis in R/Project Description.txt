@@ -1,0 +1,7 @@
+My dataset consists of responses to tweets posted by Trump during 2 days. The data is sorted according to tweet ID numbers. I would be interested in the following
+1. Sentiment Analysis Overall
+2. Sentiment Analysis by Trump's Tweet (So, if the sentiment was different in response to his tweet)
+3. Word Frequency Overall
+4. Word Frequency by Tweet
+
+I am attaching a link to the file httpswww.dropbox.comszl21mr0gvv61rh1realDonaldTrump.zipdl=0
